@@ -29,6 +29,8 @@ export default function AssignedServices() {
 
   const [showApproveModal, setShowApproveModal] = useState(false);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   /* ================= LOAD SERVICES ================= */
   const loadServices = async () => {
     const { data } = await supabase.auth.getUser();
@@ -56,7 +58,7 @@ export default function AssignedServices() {
   );
 
   useEffect(() => {
-    if (showRejectModal || showApproveModal) {
+    if (showRejectModal || showApproveModal || showDeleteModal) {
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 250,
@@ -66,7 +68,7 @@ export default function AssignedServices() {
     } else {
       scaleAnim.setValue(0);
     }
-  }, [showRejectModal, showApproveModal]);
+  }, [showRejectModal, showApproveModal, showDeleteModal]);
   /* ================= PULL TO REFRESH ================= */
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -97,12 +99,18 @@ export default function AssignedServices() {
     if (error) {
       Alert.alert("Error", "Failed to update status");
     } else {
-      if (status === "REJECTED") {
-        // 🔥 remove card immediately
-        setServices((prev) => prev.filter((item) => item.id !== id));
-      } else {
-        loadServices(); // refresh for approve
-      }
+      loadServices();
+    }
+  };
+
+  /* ================= DELETE SERVICE ================= */
+  const deleteService = async (id: string) => {
+    const { error } = await supabase.from("bookings").delete().eq("id", id);
+
+    if (error) {
+      Alert.alert("Error", "Failed to delete");
+    } else {
+      setServices((prev: any[]) => prev.filter((item: any) => item.id !== id));
     }
   };
 
@@ -160,11 +168,33 @@ export default function AssignedServices() {
                 >
                   <Text style={styles.cardTitle}>{item.customer_name}</Text>
 
-                  {isActive && (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>ACTIVE</Text>
-                    </View>
-                  )}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    {isActive && (
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                      </View>
+                    )}
+
+                    {/* 🔥 3 DOT MENU */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedId(item.id);
+                        setShowDeleteModal(true);
+                      }}
+                    >
+                      <Ionicons
+                        name="ellipsis-vertical"
+                        size={18}
+                        color="#000"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* 🔥 RUNNING STATUS */}
@@ -227,9 +257,12 @@ export default function AssignedServices() {
 
                 <View style={styles.actionRow}>
                   {item.staff_response === "APPROVED" ? (
-                    // ✅ FULL WIDTH APPROVED BUTTON
                     <View style={styles.fullApprove}>
                       <Text style={styles.fullApproveText}>✔ Approved</Text>
+                    </View>
+                  ) : item.staff_response === "REJECTED" ? (
+                    <View style={styles.fullReject}>
+                      <Text style={styles.fullRejectText}>✖ Rejected</Text>
                     </View>
                   ) : (
                     <>
@@ -325,6 +358,40 @@ export default function AssignedServices() {
                 }}
               >
                 <Text style={styles.btnText}>Approve</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={showDeleteModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[styles.modalBox, { transform: [{ scale: scaleAnim }] }]}
+          >
+            <Text style={styles.modalTitle}>Delete Service?</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to delete this service?
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmRejectBtn}
+                onPress={() => {
+                  if (selectedId) {
+                    deleteService(selectedId);
+                  }
+                  setShowDeleteModal(false);
+                }}
+              >
+                <Text style={styles.btnText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -584,6 +651,19 @@ const styles = StyleSheet.create({
   },
 
   fullApproveText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  fullReject: {
+    flex: 1,
+    backgroundColor: "#ef4444",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  fullRejectText: {
     color: "#fff",
     fontWeight: "bold",
   },
