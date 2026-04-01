@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "The Neatify Team Partner",
+    "slug": "neatify-partner-app",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "theneatifypartnerapp",
+    "userInterfaceStyle": "automatic",
+
+    "ios": {
+      "supportsTablet": true
+    },
+
+    "android": {
+      "package": "com.theneatifyteam.partner",
+      // "versionCode": 2,
+      "allowBackup": false,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#ffffff"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f5d166d2-9e5e-46e9-99c1-ea00b05b3ebe"
+      }
+    },
+
+    "owner": "akshitha0909"
+  }
+}
