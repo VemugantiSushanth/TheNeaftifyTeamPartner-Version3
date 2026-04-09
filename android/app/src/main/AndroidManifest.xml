@@ -30,6 +30,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="neatifypartnerapp"/>
+        <data android:scheme="theneatifypartnerapp"/>
       </intent-filter>
     </activity>
   </application>
