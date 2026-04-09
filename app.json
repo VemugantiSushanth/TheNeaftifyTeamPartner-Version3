@@ -14,6 +14,8 @@
 
     "android": {
       "package": "com.theneatifyteam.partner",
+
+      "googleServicesFile": "./android/app/google-services.json",
       // "versionCode": 2,
       "allowBackup": false,
       "permissions": [

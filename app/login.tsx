@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -17,8 +18,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { registerForPushNotificationsAsync } from "./notifications";
 
 import { supabase } from "../lib/supabase";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+
+    // ✅ ADD THESE (IMPORTANT)
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -180,6 +194,19 @@ export default function LoginScreen() {
       }
 
       // Step 4: Allow staff to enter app
+      // 🔔 STEP 1: Get push token
+      const token = await registerForPushNotificationsAsync();
+
+      console.log("Push Token:", token);
+
+      if (token) {
+        await supabase
+          .from("staff_profile") // ✅ your table
+          .update({ push_token: token })
+          .eq("id", userId);
+      }
+
+      // 🔔 STEP 2: Navigate
       router.replace("./my-role");
     } catch (err: any) {
       Alert.alert("Login Failed", err.message);
