@@ -504,11 +504,13 @@ export default function AssignedServiceDetails() {
       )}
 
       <View style={styles.header}>
-        <Image
-          source={require("../assets/images/logo.png")}
-          style={styles.logo}
-          contentFit="contain"
-        />
+        <TouchableOpacity onPress={() => router.replace("/my-role")}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} />
         </TouchableOpacity>
@@ -831,23 +833,55 @@ export default function AssignedServiceDetails() {
               <TouchableOpacity
                 style={styles.serviceDone}
                 onPress={async () => {
-                  await supabase
-                    .from("bookings")
-                    .update({
-                      work_status: "COMPLETED",
-                      worked_duration: formatDuration(seconds),
-                      work_ended_at: new Date().toISOString(),
-                    })
-                    .eq("id", booking.id);
+                  try {
+                    // ✅ 1. Get service ID from JSON
+                    const serviceId = booking.services?.[0]?.id;
 
-                  showPopup({
-                    title: "Well Done! 🎉",
-                    message: "You have successfully completed this service.",
-                    confirmText: "Go to Dashboard",
-                    onConfirm: () => {
-                      router.replace("/dashboard");
-                    },
-                  });
+                    if (!serviceId) {
+                      showPopup({
+                        title: "Error ❌",
+                        message: "Service ID not found",
+                      });
+                      return;
+                    }
+
+                    // ✅ 2. Fetch staff amount
+                    const { data: serviceData, error } = await supabase
+                      .from("services")
+                      .select("staff_amount")
+                      .eq("id", serviceId)
+                      .single();
+
+                    if (error) throw error;
+
+                    const amount = serviceData?.staff_amount || 0;
+
+                    // ✅ 3. Update booking with earnings
+                    await supabase
+                      .from("bookings")
+                      .update({
+                        work_status: "COMPLETED",
+                        worked_duration: formatDuration(seconds),
+                        work_ended_at: new Date().toISOString(),
+                        earned_amount: amount, // 🔥 IMPORTANT
+                      })
+                      .eq("id", booking.id);
+
+                    // ✅ 4. Show NEW popup
+                    showPopup({
+                      title: "Congratulations 🎉",
+                      message: `You have earned ₹${amount}`,
+                      confirmText: "Go to Dashboard",
+                      onConfirm: () => {
+                        router.replace("/dashboard");
+                      },
+                    });
+                  } catch (err) {
+                    showPopup({
+                      title: "Error ⚠️",
+                      message: "Something went wrong. Please try again.",
+                    });
+                  }
                 }}
               >
                 <Text style={styles.serviceDoneText}>Service Completed</Text>
@@ -953,35 +987,6 @@ export default function AssignedServiceDetails() {
           </View>
         </View>
       </Modal>
-
-      {/* ✅ FOOTER LOCKED */}
-      {!isKeyboardVisible && (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.footerItem}
-            onPress={() => router.push("/my-role")}
-          >
-            <Ionicons name="home" size={22} color="#000" />
-            <Text style={styles.footerTextActive}>Home</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.footerItem}
-            onPress={() => router.push("/dashboard")}
-          >
-            <Ionicons name="calendar-outline" size={22} color="#000" />
-            <Text style={styles.footerText}>Dashboard</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.footerItem}
-            onPress={() => router.push("/my-account")}
-          >
-            <Ionicons name="person-outline" size={22} color="#000" />
-            <Text style={styles.footerText}>Profile</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }

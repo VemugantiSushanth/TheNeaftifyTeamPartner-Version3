@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   Linking,
   ScrollView,
   StatusBar,
@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
 /* ================= SCREEN ================= */
@@ -103,7 +104,22 @@ export default function MyAccountScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
+      {/* ================= TOP HEADER ================= */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.replace("/my-role")}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* ================= HEADER ================= */}
         <View style={styles.headerCard}>
           <View>
@@ -149,7 +165,7 @@ export default function MyAccountScreen() {
         </View>
       </ScrollView>
 
-      {/* ================= UPDATED FOOTER ONLY ================= */}
+      {/* ================= UPDATED FOOTER ONLY =================
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
@@ -210,7 +226,8 @@ export default function MyAccountScreen() {
             Profile
           </Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
+      <Footer />
     </SafeAreaView>
   );
 }
@@ -349,5 +366,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "800",
     color: "#000",
+  },
+
+  header: {
+    height: 72,
+    paddingHorizontal: 20,
+    backgroundColor: "#ffffff",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  logo: {
+    width: 190,
+    height: 64,
   },
 });

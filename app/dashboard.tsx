@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
 export default function Dashboard() {
@@ -77,11 +78,13 @@ export default function Dashboard() {
 
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
-        <Image
-          source={require("../assets/images/logo.png")}
-          style={styles.logo}
-          contentFit="contain"
-        />
+        <TouchableOpacity onPress={() => router.replace("/my-role")}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -224,7 +227,10 @@ export default function Dashboard() {
       )}
 
       {/* ================= BODY ================= */}
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView
+        style={{ flexGrow: 0 }} // 🔥 ADD HERE
+        contentContainerStyle={[styles.body, { paddingBottom: 120 }]}
+      >
         {data.length === 0 && (
           <Text style={styles.empty}>No completed services</Text>
         )}
@@ -292,7 +298,7 @@ export default function Dashboard() {
         </View>
       )}
 
-      {/* ================= UPDATED FOOTER ONLY ================= */}
+      {/* ================= UPDATED FOOTER ONLY =================
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
@@ -353,7 +359,8 @@ export default function Dashboard() {
             Profile
           </Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
+      <Footer />
     </SafeAreaView>
   );
 }

@@ -40,6 +40,5 @@ app-example
 
 # generated native folders
 /ios
-/android/*
-!/android/app/
-!/android/app/google-services.json
+/android/build
+/android/.gradle

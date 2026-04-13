@@ -120,11 +120,13 @@ export default function AssignedServices() {
 
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
-        <Image
-          source={require("../assets/images/logo.png")}
-          style={styles.logo}
-          contentFit="contain"
-        />
+        <TouchableOpacity onPress={() => router.replace("/my-role")}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000" />

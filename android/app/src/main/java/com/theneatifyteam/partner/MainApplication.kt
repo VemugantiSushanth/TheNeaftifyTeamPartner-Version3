@@ -1,7 +1,9 @@
-package com.neatify.partner
+package com.theneatifyteam.partner
 
 import android.app.Application
 import android.content.res.Configuration
+
+import com.theneatifyteam.partner.BuildConfig
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication

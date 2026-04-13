@@ -18,7 +18,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
+import { registerForPushNotificationsAsync } from "./notifications";
 
 const { height, width } = Dimensions.get("window");
 const SLIDER_HEIGHT = height * 0.42;
@@ -144,6 +146,34 @@ export default function MyRoleScreen() {
     }, []),
   );
 
+  useEffect(() => {
+    const setupNotifications = async () => {
+      try {
+        const token = await registerForPushNotificationsAsync();
+
+        if (token) {
+          alert("Push Token:\n" + token); // ✅ for testing
+
+          const { data } = await supabase.auth.getUser();
+          const user = data.user;
+
+          if (user) {
+            await supabase
+              .from("staff_profile")
+              .update({ push_token: token })
+              .eq("id", user.id);
+
+            console.log("✅ Token saved to DB");
+          }
+        }
+      } catch (error) {
+        console.log("❌ Notification setup error:", error);
+      }
+    };
+
+    setupNotifications();
+  }, []);
+
   /* ================= AUTO SCROLL ================= */
   useEffect(() => {
     if (slides.length === 0) return;
@@ -224,12 +254,10 @@ export default function MyRoleScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
       {/* DROPDOWN */}
       {showMenu && (
         <Pressable style={styles.overlay} onPress={() => setShowMenu(false)} />
       )}
-
       {showMenu && (
         <View style={styles.menu}>
           <TouchableOpacity
@@ -255,7 +283,7 @@ export default function MyRoleScreen() {
       )}
       <FlatList
         data={[{ key: "main" }]}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={fetchCounts} />
         }
@@ -368,8 +396,7 @@ export default function MyRoleScreen() {
           </View>
         )}
       />
-
-      {/* FOOTER (FIXED) */}
+      {/* FOOTER (FIXED)
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
@@ -430,7 +457,8 @@ export default function MyRoleScreen() {
             Profile
           </Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
+      <Footer />
     </SafeAreaView>
   );
 }
@@ -438,7 +466,7 @@ export default function MyRoleScreen() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { backgroundColor: "#fff" },
   header: {
     height: 72,
     paddingHorizontal: 20,
