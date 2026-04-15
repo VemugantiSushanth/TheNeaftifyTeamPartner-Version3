@@ -200,7 +200,7 @@ export default function AvailabilityCalendar() {
         </TouchableOpacity>
       </View>
 
-      {/* FOOTER */}
+      {/* FOOTER
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -226,7 +226,7 @@ export default function AvailabilityCalendar() {
           <Ionicons name="person-outline" size={22} color="#000" />
           <Text style={styles.footerText}>Profile</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </SafeAreaView>
   );
 }
@@ -290,22 +290,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
+  // footer: {
+  //   height: 70,
+  //   backgroundColor: "#ffffff",
+  //   flexDirection: "row",
+  //   justifyContent: "space-around",
+  //   alignItems: "center",
+  // },
 
-  footerItem: {
-    alignItems: "center",
-  },
+  // footerItem: {
+  //   alignItems: "center",
+  // },
 
-  footerText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
-    color: "#000",
-  },
+  // footerText: {
+  //   fontSize: 12,
+  //   marginTop: 4,
+  //   fontWeight: "600",
+  //   color: "#000",
+  // },
 });

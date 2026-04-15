@@ -46,6 +46,8 @@ export default function AssignedServiceDetails() {
   const [uploading, setUploading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
+  const [staffAmount, setStaffAmount] = useState(0);
+
   // ================= TIMER CHANGE =================
   const [workStartedAt, setWorkStartedAt] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -225,6 +227,31 @@ export default function AssignedServiceDetails() {
     seconds,
     workStopped,
   ]);
+
+  useEffect(() => {
+    const fetchStaffAmount = async () => {
+      try {
+        if (!booking?.service_name) return;
+
+        const { data, error } = await supabase
+          .from("services")
+          .select("staff_amount")
+          .eq("service_name", booking.service_name) // ⚠️ change if needed
+          .single();
+
+        if (error) {
+          console.log("Error fetching staff amount:", error);
+          return;
+        }
+
+        setStaffAmount(data?.staff_amount || 0);
+      } catch (err) {
+        console.log("Unexpected error:", err);
+      }
+    };
+
+    fetchStaffAmount();
+  }, []);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -834,40 +861,28 @@ export default function AssignedServiceDetails() {
                 style={styles.serviceDone}
                 onPress={async () => {
                   try {
-                    // ✅ 1. Get service ID from JSON
-                    const serviceId = booking.services?.[0]?.id;
+                    let amount = staffAmount;
 
-                    if (!serviceId) {
-                      showPopup({
-                        title: "Error ❌",
-                        message: "Service ID not found",
-                      });
-                      return;
-                    }
-
-                    // ✅ 2. Fetch staff amount
-                    const { data: serviceData, error } = await supabase
-                      .from("services")
-                      .select("staff_amount")
-                      .eq("id", serviceId)
-                      .single();
-
-                    if (error) throw error;
-
-                    const amount = serviceData?.staff_amount || 0;
-
-                    // ✅ 3. Update booking with earnings
-                    await supabase
+                    // ✅ SAME OLD WORKING UPDATE (DO NOT CHANGE FLOW)
+                    const { error } = await supabase
                       .from("bookings")
                       .update({
                         work_status: "COMPLETED",
                         worked_duration: formatDuration(seconds),
+                        staff_earned_amount: amount,
                         work_ended_at: new Date().toISOString(),
-                        earned_amount: amount, // 🔥 IMPORTANT
                       })
                       .eq("id", booking.id);
 
-                    // ✅ 4. Show NEW popup
+                    if (error) {
+                      showPopup({
+                        title: "Error ❌",
+                        message: "Failed to complete service",
+                      });
+                      return;
+                    }
+
+                    // ✅ NEW POPUP (ONLY CHANGE YOU WANTED)
                     showPopup({
                       title: "Congratulations 🎉",
                       message: `You have earned ₹${amount}`,
@@ -1084,16 +1099,6 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   loaderText: { marginTop: 10, fontWeight: "700" },
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
-  footerItem: { alignItems: "center" },
-  footerText: { fontSize: 12, marginTop: 4, fontWeight: "600" },
-  footerTextActive: { fontSize: 12, marginTop: 4, fontWeight: "800" },
 
   modalOverlay: {
     position: "absolute",

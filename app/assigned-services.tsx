@@ -40,8 +40,10 @@ export default function AssignedServices() {
       .from("bookings")
       .select("*")
       .eq("assigned_staff_email", email)
+      .or(
+        "staff_response.eq.pending,staff_response.eq.APPROVED,staff_response.is.null",
+      )
       .neq("work_status", "COMPLETED");
-
     setServices(bookings || []);
   };
 
@@ -91,9 +93,18 @@ export default function AssignedServices() {
     id: string,
     status: "APPROVED" | "REJECTED",
   ) => {
+    let updateData: any = {
+      staff_response: status,
+    };
+
+    // 🔥 KEY LOGIC
+    if (status === "APPROVED") {
+      updateData.work_status = "ASSIGNED";
+    }
+
     const { error } = await supabase
       .from("bookings")
-      .update({ staff_response: status })
+      .update(updateData)
       .eq("id", id);
 
     if (error) {
@@ -399,33 +410,6 @@ export default function AssignedServices() {
           </Animated.View>
         </View>
       </Modal>
-
-      {/* ================= FOOTER ================= */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.footerItem}
-          onPress={() => router.replace("/my-role")}
-        >
-          <Ionicons name="home-outline" size={22} color="#000000" />
-          <Text style={styles.footerText}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.footerItem}
-          onPress={() => router.push("/dashboard")}
-        >
-          <Ionicons name="calendar-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Dashboard</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.footerItem}
-          onPress={() => router.push("/my-account")}
-        >
-          <Ionicons name="person-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -536,26 +520,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 40,
     color: "#666",
-  },
-
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
-
-  footerItem: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  footerText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
-    color: "#000",
   },
 
   actionRow: {

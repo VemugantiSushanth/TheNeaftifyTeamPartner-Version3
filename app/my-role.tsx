@@ -29,6 +29,7 @@ export default function MyRoleScreen() {
   const pathname = usePathname();
 
   const [newCount, setNewCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const [assignedCount, setAssignedCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [activeSlide, setActiveSlide] = useState(0);
@@ -96,10 +97,19 @@ export default function MyRoleScreen() {
       .eq("assigned_staff_email", email)
       .eq("is_viewed", false);
 
+    // ✅ PENDING
+    const { count: pending } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_staff_email", email)
+      .or("staff_response.is.null,staff_response.eq.pending");
+
+    // ✅ ASSIGNED (ONLY APPROVED)
     const { count: assigned } = await supabase
       .from("bookings")
       .select("*", { count: "exact", head: true })
       .eq("assigned_staff_email", email)
+      .eq("staff_response", "APPROVED")
       .neq("work_status", "COMPLETED");
 
     const { count: completed } = await supabase
@@ -111,7 +121,8 @@ export default function MyRoleScreen() {
     const assignedValue = assigned || 0;
 
     setNewCount(notif || 0);
-    setAssignedCount(assignedValue);
+    setPendingCount(pending || 0);
+    setAssignedCount(assigned || 0);
     setCompletedCount(completed || 0);
 
     // 🔥 NEW PART: Sync with staff_profile table
@@ -360,6 +371,17 @@ export default function MyRoleScreen() {
 
             {/* SUMMARY */}
             <View style={styles.summaryRow}>
+              {/* PENDING */}
+              <TouchableOpacity
+                style={[styles.summaryBox, { borderColor: "#facc15" }]}
+                onPress={() => router.push("/pending-services")}
+              >
+                <Text style={styles.summaryTitle}>Pending</Text>
+                <Text style={[styles.summaryCount, { color: "#facc15" }]}>
+                  {pendingCount}
+                </Text>
+              </TouchableOpacity>
+
               {/* ASSIGNED */}
               <TouchableOpacity
                 style={[styles.summaryBox, styles.assignedBox]}
@@ -526,17 +548,20 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: "row",
     marginHorizontal: 16,
-    gap: 10,
+    gap: 8,
     marginTop: 10,
   },
   summaryBox: {
     flex: 1,
     borderRadius: 14,
-    paddingVertical: 10, // 🔽 reduced
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6, // 🔽 reduce a bit
     alignItems: "center",
     backgroundColor: "#f9fafb",
     borderWidth: 1,
+  },
+  pendingBox: {
+    borderColor: "#facc15",
   },
   assignedBox: { borderColor: "#f97316" },
   completedBox: { borderColor: "#16a34a" },
@@ -592,16 +617,16 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { fontWeight: "800", fontSize: 16 },
 
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
-  footerItem: { alignItems: "center" },
-  footerText: { fontSize: 12, marginTop: 4, fontWeight: "600" },
-  footerTextActive: { fontSize: 12, marginTop: 4, fontWeight: "800" },
+  // footer: {
+  //   height: 70,
+  //   backgroundColor: "#ffffff",
+  //   flexDirection: "row",
+  //   justifyContent: "space-around",
+  //   alignItems: "center",
+  // },
+  // footerItem: { alignItems: "center" },
+  // footerText: { fontSize: 12, marginTop: 4, fontWeight: "600" },
+  // footerTextActive: { fontSize: 12, marginTop: 4, fontWeight: "800" },
 
   dots: {
     position: "absolute",

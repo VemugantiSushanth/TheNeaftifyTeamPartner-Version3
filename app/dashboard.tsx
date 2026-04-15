@@ -42,7 +42,9 @@ export default function Dashboard() {
 
     let query = supabase
       .from("bookings")
-      .select("customer_name,email,services,work_ended_at,worked_duration")
+      .select(
+        "id,customer_name,email,services,work_ended_at,worked_duration,staff_earned_amount",
+      )
       .eq("assigned_staff_email", email)
       .eq("work_status", "COMPLETED");
     if (sortBy === "recent") {
@@ -244,6 +246,18 @@ export default function Dashboard() {
               <Text style={styles.completedBadge}>COMPLETED</Text>
             </View>
 
+            {/* ✅ EARNINGS DISPLAY */}
+            <Text
+              style={{
+                marginTop: 6,
+                fontWeight: "800",
+                color: "#16a34a",
+                fontSize: 15,
+              }}
+            >
+              + ₹{item.staff_earned_amount || 0}
+            </Text>
+
             {/* BUTTON */}
             <TouchableOpacity
               style={styles.viewBtn}
@@ -285,6 +299,12 @@ export default function Dashboard() {
             {selectedItem.worked_duration && (
               <Text style={styles.modalText}>
                 Worked Time: {selectedItem.worked_duration}
+              </Text>
+            )}
+
+            {selectedItem.staff_earned_amount > 0 && (
+              <Text style={styles.modalText}>
+                Amount Earned: ₹{selectedItem.staff_earned_amount}
               </Text>
             )}
 
@@ -458,32 +478,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
+  // footer: {
+  //   height: 70,
+  //   backgroundColor: "#ffffff",
+  //   flexDirection: "row",
+  //   justifyContent: "space-around",
+  //   alignItems: "center",
+  // },
 
-  footerItem: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // footerItem: {
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  // },
 
-  footerText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
-    color: "#000",
-  },
+  // footerText: {
+  //   fontSize: 12,
+  //   marginTop: 4,
+  //   fontWeight: "600",
+  //   color: "#000",
+  // },
 
-  footerTextActive: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "800",
-    color: "#000",
-  },
+  // footerTextActive: {
+  //   fontSize: 12,
+  //   marginTop: 4,
+  //   fontWeight: "800",
+  //   color: "#000",
+  // },
 
   worked: {
     marginTop: 4,

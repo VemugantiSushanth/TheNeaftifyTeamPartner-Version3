@@ -156,7 +156,7 @@ export default function NewServices() {
         )}
       </ScrollView>
 
-      {/* ================= FOOTER ================= */}
+      {/* ================= FOOTER =================
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
@@ -181,7 +181,7 @@ export default function NewServices() {
           <Ionicons name="person-outline" size={22} color="#000" />
           <Text style={styles.footerText}>Profile</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </SafeAreaView>
   );
 }
@@ -253,23 +253,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  footer: {
-    height: 70,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
+  // footer: {
+  //   height: 70,
+  //   backgroundColor: "#ffffff",
+  //   flexDirection: "row",
+  //   justifyContent: "space-around",
+  //   alignItems: "center",
+  // },
 
-  footerItem: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // footerItem: {
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  // },
 
-  footerText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
-    color: "#000",
-  },
+  // footerText: {
+  //   fontSize: 12,
+  //   marginTop: 4,
+  //   fontWeight: "600",
+  //   color: "#000",
+  // },
 });
