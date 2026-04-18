@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useNavigation } from "@react-navigation/native";
+import dayjs from "dayjs";
 import { Image } from "expo-image";
 import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,7 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
 export default function Dashboard() {
@@ -27,6 +29,15 @@ export default function Dashboard() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
 
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [weeklyEarnings, setWeeklyEarnings] = useState(0);
+  const [monthlyEarnings, setMonthlyEarnings] = useState(0);
+
+  const [filter, setFilter] = useState("ALL");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const navigation = useNavigation();
+
   useEffect(() => {
     loadCompleted();
   }, []);
@@ -35,6 +46,166 @@ export default function Dashboard() {
     loadCompleted(filterDate || undefined);
   }, [sortBy]);
 
+  const updateStaffProfile = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+
+      if (!userData?.user?.email) return;
+
+      const { error } = await supabase
+        .from("staff_profile")
+        .update({
+          total_completed: data.length,
+          total_earnings: totalEarnings,
+          weekly_earnings: weeklyEarnings,
+        })
+        .eq("email", userData.user.email);
+
+      if (error) {
+        console.log("Update error:", error);
+      } else {
+        console.log("✅ Staff profile updated");
+      }
+    } catch (err) {
+      console.log("Unexpected error:", err);
+    }
+  };
+
+  const updateMonthlyJSON = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user?.email) return;
+
+      const email = userData.user.email;
+
+      // 1. Get existing JSON
+      const { data: existingData } = await supabase
+        .from("staff_profile")
+        .select("monthly_earnings_json")
+        .eq("email", email)
+        .single();
+
+      let monthlyJSON = existingData?.monthly_earnings_json || {};
+
+      // 🔥 2. Calculate from bookings (CORRECT WAY)
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("staff_earned_amount, work_ended_at")
+        .eq("assigned_staff_email", email)
+        .eq("work_status", "COMPLETED");
+
+      const currentMonth = dayjs().format("YYYY-MM");
+
+      const monthlyTotal =
+        bookings
+          ?.filter(
+            (item: any) =>
+              dayjs(item.work_ended_at).format("YYYY-MM") === currentMonth,
+          )
+          .reduce(
+            (sum: number, item: any) =>
+              sum + Number(item.staff_earned_amount || 0),
+            0,
+          ) || 0;
+
+      // ✅ Save correct value
+      monthlyJSON[currentMonth] = monthlyTotal;
+
+      // 3. Save back
+      const { error } = await supabase
+        .from("staff_profile")
+        .update({
+          monthly_earnings_json: monthlyJSON,
+        })
+        .eq("email", email);
+
+      if (error) console.log("JSON update error:", error);
+      else console.log("✅ Monthly JSON updated correctly");
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const updateAllEarnings = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+
+      if (!email) return;
+
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("staff_earned_amount, work_ended_at")
+        .eq("assigned_staff_email", email)
+        .eq("work_status", "COMPLETED");
+
+      const now = new Date();
+
+      let total = 0;
+      let weekly = 0;
+      let monthly = 0;
+
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+
+      bookings?.forEach((item: any) => {
+        const amount = Number(item.staff_earned_amount || 0);
+        const date = new Date(item.work_ended_at);
+
+        total += amount;
+
+        // ✅ Weekly
+        if (date >= oneWeekAgo) {
+          weekly += amount;
+        }
+
+        // ✅ Monthly
+        if (
+          date.getMonth() === now.getMonth() &&
+          date.getFullYear() === now.getFullYear()
+        ) {
+          monthly += amount;
+        }
+      });
+
+      // 🔥 UPDATE EVERYTHING IN ONE CALL
+      const { error } = await supabase
+        .from("staff_profile")
+        .update({
+          total_earnings: total,
+          weekly_earnings: weekly,
+          monthly_earnings: monthly,
+        })
+        .eq("email", email);
+
+      if (error) console.log("Update error:", error);
+      else console.log("✅ All earnings updated");
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEarnings();
+  }, []);
+
+  useEffect(() => {
+    updateAllEarnings(); // 🔥 new function
+    updateMonthlyJSON(); // JSON storage
+  }, [data]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+    try {
+      await loadCompleted(); // your existing function
+      await fetchEarnings(); // earnings function we created
+    } catch (err) {
+      console.log("Refresh error:", err);
+    }
+
+    setRefreshing(false);
+  };
   /* ================= LOAD COMPLETED ================= */
   const loadCompleted = async (date?: string) => {
     const { data: user } = await supabase.auth.getUser();
@@ -65,6 +236,80 @@ export default function Dashboard() {
     setData(data || []);
   };
 
+  const filteredData = data.filter((item) => {
+    const date = new Date(item.work_ended_at);
+    const now = new Date();
+
+    if (filter === "WEEKLY") {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      return date >= oneWeekAgo;
+    }
+
+    if (filter === "MONTHLY") {
+      return (
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear()
+      );
+    }
+
+    return true; // ALL
+  });
+
+  /* ================= Fetch Earnings ================= */
+
+  const fetchEarnings = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+
+      if (!email) return;
+      const { data, error } = await supabase
+        .from("staff_earnings")
+        .select("amount, earned_at")
+        .eq("staff_email", email); // 🔥 IMPORTANT
+      if (error) {
+        console.log("Error fetching earnings:", error);
+        return;
+      }
+
+      const now = new Date();
+
+      let total = 0;
+      let weekly = 0;
+      let monthly = 0;
+
+      data?.forEach((item) => {
+        const amount = Number(item.amount || 0);
+        const date = new Date(item.earned_at);
+
+        total += amount;
+
+        // ✅ Weekly (last 7 days)
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(now.getDate() - 7);
+
+        if (date >= oneWeekAgo) {
+          weekly += amount;
+        }
+
+        // ✅ Monthly (current month)
+        if (
+          date.getMonth() === now.getMonth() &&
+          date.getFullYear() === now.getFullYear()
+        ) {
+          monthly += amount;
+        }
+      });
+
+      setTotalEarnings(total);
+      setWeeklyEarnings(weekly);
+      setMonthlyEarnings(monthly);
+    } catch (err) {
+      console.log("Unexpected error:", err);
+    }
+  };
+
   /* ================= FORMAT DATE ================= */
   const formatDateTime = (value: string) => {
     const d = new Date(value);
@@ -77,7 +322,6 @@ export default function Dashboard() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
-
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace("/my-role")}>
@@ -92,14 +336,40 @@ export default function Dashboard() {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
       </View>
-
       {/* ================= TOTAL COUNT ================= */}
-      <View style={styles.countBox}>
-        <Text style={styles.countText}>
-          Total Completed: <Text style={styles.countNumber}>{data.length}</Text>
-        </Text>
-      </View>
+      <View style={styles.summaryContainer}>
+        <TouchableOpacity
+          style={styles.gridBox}
+          onPress={() => setFilter("ALL")}
+        >
+          <Text style={styles.gridTitle}>Total Completed</Text>
+          <Text style={styles.gridValue}>{data.length}</Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.gridBox}
+          onPress={() => setFilter("ALL")}
+        >
+          <Text style={styles.gridTitle}>Total Earnings</Text>
+          <Text style={styles.gridValue}>₹{totalEarnings}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.gridBox}
+          onPress={() => setFilter("WEEKLY")}
+        >
+          <Text style={styles.gridTitle}>Weekly</Text>
+          <Text style={styles.gridValue}>₹{weeklyEarnings}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.gridBox}
+          onPress={() => router.push("/monthly-screen")}
+        >
+          <Text style={styles.gridTitle}>Monthly</Text>
+          <Text style={styles.gridValue}>₹{monthlyEarnings}</Text>
+        </TouchableOpacity>
+      </View>
       {/* ================= FILTER ================= */}
       <View style={styles.filterRow}>
         <View style={styles.filterBox}>
@@ -204,7 +474,6 @@ export default function Dashboard() {
           )}
         </View>
       </View>
-
       {showCalendar && (
         <DateTimePicker
           value={new Date()}
@@ -227,36 +496,37 @@ export default function Dashboard() {
           }}
         />
       )}
-
       {/* ================= BODY ================= */}
       <ScrollView
-        style={{ flexGrow: 0 }} // 🔥 ADD HERE
-        contentContainerStyle={[styles.body, { paddingBottom: 120 }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: 120,
+          flexGrow: 1, // ✅ IMPORTANT
+        }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        alwaysBounceVertical={true}
       >
-        {data.length === 0 && (
+        {data.length === 0 ? (
           <Text style={styles.empty}>No completed services</Text>
-        )}
+        ) : null}
 
-        {data.map((item, i) => (
+        {filteredData.map((item, i) => (
           <View key={i} style={styles.card}>
             {/* TOP ROW */}
             <View style={styles.cardTop}>
               <Text style={styles.name}>{item.customer_name}</Text>
 
-              <Text style={styles.completedBadge}>COMPLETED</Text>
-            </View>
+              <View style={styles.rightContainer}>
+                <Text style={styles.completedBadge}>COMPLETED</Text>
 
-            {/* ✅ EARNINGS DISPLAY */}
-            <Text
-              style={{
-                marginTop: 6,
-                fontWeight: "800",
-                color: "#16a34a",
-                fontSize: 15,
-              }}
-            >
-              + ₹{item.staff_earned_amount || 0}
-            </Text>
+                <Text style={styles.amountText}>
+                  + ₹{Number(item.staff_earned_amount || 0)}
+                </Text>
+              </View>
+            </View>
 
             {/* BUTTON */}
             <TouchableOpacity
@@ -271,7 +541,6 @@ export default function Dashboard() {
           </View>
         ))}
       </ScrollView>
-
       {showModal && selectedItem && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -317,7 +586,6 @@ export default function Dashboard() {
           </View>
         </View>
       )}
-
       {/* ================= UPDATED FOOTER ONLY =================
       <View style={styles.footer}>
         <TouchableOpacity
@@ -380,7 +648,6 @@ export default function Dashboard() {
           </Text>
         </TouchableOpacity>
       </View> */}
-      <Footer />
     </SafeAreaView>
   );
 }
@@ -636,5 +903,72 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "700",
     fontSize: 13,
+  },
+
+  amountRow: {
+    alignItems: "flex-end", // 👈 pushes to right
+    marginTop: 6,
+  },
+
+  rightContainer: {
+    alignItems: "center", // 👈 centers amount under badge
+  },
+
+  amountText: {
+    marginTop: 6, // 👈 spacing between COMPLETED & amount
+    color: "#16a34a",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+
+  summaryContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+
+  gridBox: {
+    width: "48%", // 🔥 THIS CREATES 2 COLUMNS
+    backgroundColor: "#E6F4EA",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#A3D9A5",
+
+    // 🔥 premium look
+    elevation: 3,
+  },
+
+  gridTitle: {
+    fontSize: 13,
+    color: "#2E7D32",
+    marginBottom: 6,
+  },
+
+  gridValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1B5E20",
+  },
+
+  summaryBox: {
+    backgroundColor: "#E6F4EA",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#A3D9A5",
+    elevation: 2,
+  },
+
+  summaryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1B5E20",
   },
 });

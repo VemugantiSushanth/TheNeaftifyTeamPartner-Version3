@@ -18,7 +18,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 import { registerForPushNotificationsAsync } from "./notifications";
 
@@ -480,7 +479,6 @@ export default function MyRoleScreen() {
           </Text>
         </TouchableOpacity>
       </View> */}
-      <Footer />
     </SafeAreaView>
   );
 }

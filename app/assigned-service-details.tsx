@@ -27,6 +27,7 @@ import { supabase } from "../lib/supabase";
 export default function AssignedServiceDetails() {
   const params = useLocalSearchParams();
   const booking = params.booking ? JSON.parse(params.booking as string) : null;
+  const serviceId = booking?.services?.[0]?.id;
 
   const STORAGE_KEY = booking ? `booking_${booking.id}` : "";
 
@@ -231,12 +232,14 @@ export default function AssignedServiceDetails() {
   useEffect(() => {
     const fetchStaffAmount = async () => {
       try {
-        if (!booking?.service_name) return;
+        console.log("SERVICE ID:", serviceId);
+
+        if (!serviceId) return;
 
         const { data, error } = await supabase
           .from("services")
           .select("staff_amount")
-          .eq("service_name", booking.service_name) // ⚠️ change if needed
+          .eq("id", serviceId)
           .single();
 
         if (error) {
@@ -244,14 +247,21 @@ export default function AssignedServiceDetails() {
           return;
         }
 
-        setStaffAmount(data?.staff_amount || 0);
+        console.log("Fetched staff amount:", data);
+
+        // 🔥 FIX HERE
+        const rawAmount = data?.staff_amount ?? 0;
+
+        const cleanedAmount = Number(String(rawAmount).replace(/[^0-9.]/g, ""));
+
+        setStaffAmount(cleanedAmount);
       } catch (err) {
         console.log("Unexpected error:", err);
       }
     };
 
     fetchStaffAmount();
-  }, []);
+  }, [serviceId]); // ✅ IMPORTANT
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -265,7 +275,7 @@ export default function AssignedServiceDetails() {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [serviceId]);
   useEffect(() => {
     if (!workStartedAt) return;
 
@@ -284,6 +294,7 @@ export default function AssignedServiceDetails() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [workStartedAt]);
+
   // ================= TIMER CHANGE END =================
 
   const formatDuration = (t: number) => {
@@ -875,13 +886,19 @@ export default function AssignedServiceDetails() {
                       .eq("id", booking.id);
 
                     if (error) {
+                      console.log("❌ SUPABASE ERROR:", error); // 👈 ADD THIS
                       showPopup({
                         title: "Error ❌",
-                        message: "Failed to complete service",
+                        message: error.message || "Failed to complete service",
                       });
                       return;
                     }
-
+                    await supabase.from("staff_earnings").insert({
+                      booking_id: booking.id,
+                      staff_email: booking.assigned_staff_email,
+                      staff_name: booking.customer_name, // or staff name if you have
+                      amount: amount,
+                    });
                     // ✅ NEW POPUP (ONLY CHANGE YOU WANTED)
                     showPopup({
                       title: "Congratulations 🎉",

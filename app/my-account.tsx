@@ -13,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
 /* ================= SCREEN ================= */
@@ -227,7 +226,6 @@ export default function MyAccountScreen() {
           </Text>
         </TouchableOpacity>
       </View> */}
-      <Footer />
     </SafeAreaView>
   );
 }

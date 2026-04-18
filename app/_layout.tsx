@@ -1,5 +1,6 @@
 import { Stack, usePathname } from "expo-router";
-import { SafeAreaView, View } from "react-native";
+import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Footer from "../components/Footer";
 
 export default function Layout() {
@@ -8,7 +9,10 @@ export default function Layout() {
   const hideFooter = pathname === "/login"; // 👈 condition
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#fff" }}
+      edges={["left", "right", "bottom"]} // ❌ remove top safe area
+    >
       {/* SCREENS */}
       <View style={{ flex: 1 }}>
         <Stack
