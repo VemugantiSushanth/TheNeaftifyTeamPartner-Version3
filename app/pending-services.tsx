@@ -27,8 +27,18 @@ export default function PendingServices() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const rejectReasons = [
+    "Location too far",
+    "Time Not Available",
+    "Personal Emergency",
+    "Customer not reachable",
+    "Out of scope (Commercial / PG / Hostels / High-usage / Unmanaged Locations)",
+  ];
   /* ================= LOAD ONLY PENDING ================= */
   const loadServices = async () => {
     const { data } = await supabase.auth.getUser();
@@ -50,17 +60,17 @@ export default function PendingServices() {
   );
 
   useEffect(() => {
-    if (showRejectModal || showApproveModal) {
+    if (showRejectModal || showApproveModal || showSuccessModal) {
+      scaleAnim.setValue(0); // 🔥 reset before animation
+
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 250,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }).start();
-    } else {
-      scaleAnim.setValue(0);
     }
-  }, [showRejectModal, showApproveModal]);
+  }, [showRejectModal, showApproveModal, showSuccessModal]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -83,11 +93,16 @@ export default function PendingServices() {
   const updateResponse = async (
     id: string,
     status: "APPROVED" | "REJECTED",
+    reason?: string,
   ) => {
     let updateData: any = { staff_response: status };
 
     if (status === "APPROVED") {
       updateData.work_status = "ASSIGNED";
+    }
+
+    if (status === "REJECTED") {
+      updateData.reject_reason = reason;
     }
 
     const { error } = await supabase
@@ -98,10 +113,18 @@ export default function PendingServices() {
     if (error) {
       Alert.alert("Error", "Failed to update");
     } else {
-      loadServices();
+      // ✅ UPDATE LOCALLY INSTEAD OF RELOAD
+      setServices((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, ...updateData } : item,
+        ),
+      );
+
+      if (status === "APPROVED") {
+        setShowSuccessModal(true); // 👈 show popup
+      }
     }
   };
-
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
@@ -181,25 +204,48 @@ export default function PendingServices() {
 
               {/* ACTION BUTTONS */}
               <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={styles.approveBtn}
-                  onPress={() => {
-                    setSelectedId(item.id);
-                    setShowApproveModal(true);
-                  }}
-                >
-                  <Text style={styles.btnText}>Approve</Text>
-                </TouchableOpacity>
+                {item.staff_response === "APPROVED" ? (
+                  <>
+                    <TouchableOpacity
+                      style={[
+                        styles.approveBtn,
+                        { backgroundColor: "#bbf7d0" },
+                      ]}
+                      disabled
+                    >
+                      <Text style={styles.btnText}>Approved</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.rejectBtn}
-                  onPress={() => {
-                    setSelectedId(item.id);
-                    setShowRejectModal(true);
-                  }}
-                >
-                  <Text style={styles.btnText}>Reject</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.viewBtn}
+                      onPress={() => router.push("/assigned-services")}
+                    >
+                      <Text style={styles.btnText}>View Service</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.approveBtn}
+                      onPress={() => {
+                        setSelectedId(item.id);
+                        setShowApproveModal(true);
+                      }}
+                    >
+                      <Text style={styles.btnText}>Approve</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      onPress={() => {
+                        setSelectedId(item.id);
+                        setShowRejectModal(true);
+                      }}
+                    >
+                      <Text style={styles.btnText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           ))
@@ -228,8 +274,11 @@ export default function PendingServices() {
               <TouchableOpacity
                 style={[styles.confirmBtn, { backgroundColor: "green" }]}
                 onPress={() => {
-                  if (selectedId) updateResponse(selectedId, "APPROVED");
-                  setShowApproveModal(false);
+                  if (selectedId) {
+                    updateResponse(selectedId, "APPROVED");
+                  }
+
+                  setShowApproveModal(false); // close confirm modal
                 }}
               >
                 <Text style={styles.btnText}>Approve</Text>
@@ -245,12 +294,30 @@ export default function PendingServices() {
           <Animated.View
             style={[styles.modalBox, { transform: [{ scale: scaleAnim }] }]}
           >
-            <Text style={styles.modalTitle}>Reject Service?</Text>
+            <Text style={styles.modalTitle}>Select Reason</Text>
 
-            <View style={styles.modalActions}>
+            {rejectReasons.map((reason, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.reasonRow}
+                onPress={() => setSelectedReason(reason)}
+              >
+                <View style={styles.radioOuter}>
+                  {selectedReason === reason && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
+                <Text style={styles.reasonText}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={[styles.modalActions, { marginTop: 20 }]}>
               <TouchableOpacity
                 style={styles.cancelBtn}
-                onPress={() => setShowRejectModal(false)}
+                onPress={() => {
+                  setShowRejectModal(false);
+                  setSelectedReason(null);
+                }}
               >
                 <Text style={styles.btnText}>Cancel</Text>
               </TouchableOpacity>
@@ -258,11 +325,51 @@ export default function PendingServices() {
               <TouchableOpacity
                 style={styles.confirmBtn}
                 onPress={() => {
-                  if (selectedId) updateResponse(selectedId, "REJECTED");
+                  if (!selectedReason) {
+                    Alert.alert("Please select a reason");
+                    return;
+                  }
+
+                  if (selectedId)
+                    updateResponse(selectedId, "REJECTED", selectedReason);
+
                   setShowRejectModal(false);
+                  setSelectedReason(null);
                 }}
               >
                 <Text style={styles.btnText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+      <Modal transparent visible={showSuccessModal}>
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[styles.modalBox, { transform: [{ scale: scaleAnim }] }]}
+          >
+            <Text style={styles.modalTitle}>Service Approved ✅</Text>
+
+            <Text style={styles.modalText}>
+              Do you want to view this service?
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowSuccessModal(false)}
+              >
+                <Text style={styles.btnText}>Close</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmBtn, { backgroundColor: "green" }]}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.push("/assigned-services");
+                }}
+              >
+                <Text style={styles.btnText}>View Service</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -393,6 +500,44 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     backgroundColor: "#ef4444",
+    borderRadius: 8,
+    marginLeft: 5,
+    alignItems: "center",
+  },
+
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 8,
+  },
+
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#ef4444",
+  },
+
+  reasonText: {
+    flex: 1,
+    fontSize: 14,
+  },
+
+  viewBtn: {
+    flex: 1,
+    backgroundColor: "#dbeafe",
+    padding: 10,
     borderRadius: 8,
     marginLeft: 5,
     alignItems: "center",

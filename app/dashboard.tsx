@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation } from "@react-navigation/native";
 import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
 import { Image } from "expo-image";
 import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../lib/supabase";
+dayjs.extend(isoWeek);
 
 export default function Dashboard() {
   const pathname = usePathname();
@@ -144,6 +146,7 @@ export default function Dashboard() {
       let total = 0;
       let weekly = 0;
       let monthly = 0;
+      let weeklyJSON: any = {};
 
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(now.getDate() - 7);
@@ -154,18 +157,39 @@ export default function Dashboard() {
 
         total += amount;
 
-        // ✅ Weekly
+        const d = dayjs(date);
+        const yearMonth = d.format("YYYY-MM");
+        const day = d.date();
+
+        // ✅ Weekly (last 7 days - for dashboard card)
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(new Date().getDate() - 7);
         if (date >= oneWeekAgo) {
           weekly += amount;
         }
 
         // ✅ Monthly
         if (
-          date.getMonth() === now.getMonth() &&
-          date.getFullYear() === now.getFullYear()
+          date.getMonth() === new Date().getMonth() &&
+          date.getFullYear() === new Date().getFullYear()
         ) {
           monthly += amount;
         }
+
+        // 🔥 WEEKLY JSON (MAIN PART)
+        if (!weeklyJSON[yearMonth]) {
+          weeklyJSON[yearMonth] = {
+            week1: 0,
+            week2: 0,
+            week3: 0,
+            week4: 0,
+          };
+        }
+
+        if (day <= 7) weeklyJSON[yearMonth].week1 += amount;
+        else if (day <= 14) weeklyJSON[yearMonth].week2 += amount;
+        else if (day <= 21) weeklyJSON[yearMonth].week3 += amount;
+        else weeklyJSON[yearMonth].week4 += amount;
       });
 
       // 🔥 UPDATE EVERYTHING IN ONE CALL
@@ -175,6 +199,7 @@ export default function Dashboard() {
           total_earnings: total,
           weekly_earnings: weekly,
           monthly_earnings: monthly,
+          weekly_earnings_json: weeklyJSON, // ✅ ADD THIS
         })
         .eq("email", email);
 
@@ -356,7 +381,7 @@ export default function Dashboard() {
 
         <TouchableOpacity
           style={styles.gridBox}
-          onPress={() => setFilter("WEEKLY")}
+          onPress={() => router.push("/weekly-screen")}
         >
           <Text style={styles.gridTitle}>Weekly</Text>
           <Text style={styles.gridValue}>₹{weeklyEarnings}</Text>
