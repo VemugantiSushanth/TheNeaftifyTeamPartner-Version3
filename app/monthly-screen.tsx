@@ -115,12 +115,17 @@ const MonthlyScreen = () => {
             <Picker
               selectedValue={selectedYear}
               onValueChange={(itemValue) => setSelectedYear(itemValue)}
-              style={styles.picker}
+              style={[styles.picker, { color: "#000" }]} // ✅ FIX
             >
               {Array.from({ length: 10 }, (_, i) => {
                 const year = currentYear - i;
                 return (
-                  <Picker.Item key={year} label={`${year}`} value={year} />
+                  <Picker.Item
+                    key={year}
+                    label={`${year}`}
+                    value={year}
+                    color="#000" // ✅ ADD THIS
+                  />
                 );
               })}
             </Picker>

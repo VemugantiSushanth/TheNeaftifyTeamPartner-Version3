@@ -896,7 +896,7 @@ export default function AssignedServiceDetails() {
                     await supabase.from("staff_earnings").insert({
                       booking_id: booking.id,
                       staff_email: booking.assigned_staff_email,
-                      staff_name: booking.customer_name, // or staff name if you have
+                      Customer_Name: booking.customer_name, // or staff name if you have
                       amount: amount,
                     });
                     // ✅ NEW POPUP (ONLY CHANGE YOU WANTED)

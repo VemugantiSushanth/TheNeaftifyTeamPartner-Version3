@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import dayjs from "dayjs";
+import isBetween from "dayjs/plugin/isBetween";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,11 +16,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../lib/supabase";
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isBetween);
 
 type Booking = {
   customer_name: string;
   staff_earned_amount: number;
-  completed_at: string;
+  work_ended_at: string;
 };
 
 const WeeklyScreen = () => {
@@ -39,19 +43,71 @@ const WeeklyScreen = () => {
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format("MM"));
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
 
+  const [dailyData, setDailyData] = useState<
+    { date: string; amount: number }[]
+  >([]);
+
   const [earnings, setEarnings] = useState(0);
   const [data, setData] = useState<Booking[]>([]);
+
+  const getWeekLabel = () => {
+    if (selectedWeek === 1) return "Week 1 (1-7)";
+    if (selectedWeek === 2) return "Week 2 (8-14)";
+    if (selectedWeek === 3) return "Week 3 (15-21)";
+    return "Week 4 (22-end)";
+  };
 
   const selectedYearWeek = `${selectedYear}-W${String(selectedWeek).padStart(2, "0")}`;
 
   const getWeekRange = (year: number, month: string, week: number) => {
     const startDay = (week - 1) * 7 + 1;
-    const endDay = week === 4 ? 31 : week * 7;
 
-    const start = dayjs(`${year}-${month}-${startDay}`).startOf("day");
-    const end = dayjs(`${year}-${month}-${endDay}`).endOf("day");
+    // ✅ get actual last day of month
+    const daysInMonth = dayjs(`${year}-${month}-01`).daysInMonth();
+    let endDay = week * 7;
+
+    // ✅ fix for last week
+    if (week === 4 || endDay > daysInMonth) {
+      endDay = daysInMonth;
+    }
+
+    const start = dayjs(
+      `${year}-${month}-${String(startDay).padStart(2, "0")}`,
+    ).startOf("day");
+
+    const end = dayjs(
+      `${year}-${month}-${String(endDay).padStart(2, "0")}`,
+    ).endOf("day");
 
     return { start, end };
+  };
+
+  const getDailyEarnings = (
+    bookings: any[],
+    start: dayjs.Dayjs,
+    end: dayjs.Dayjs,
+  ) => {
+    let result: { date: string; amount: number }[] = [];
+
+    const totalDays = end.diff(start, "day") + 1; // ✅ includes last day
+
+    for (let i = 0; i < totalDays; i++) {
+      const current = start.add(i, "day");
+      const dateStr = current.format("YYYY-MM-DD");
+
+      const total = bookings
+        .filter(
+          (item) => dayjs(item.work_ended_at).format("YYYY-MM-DD") === dateStr,
+        )
+        .reduce((sum, item) => sum + Number(item.staff_earned_amount || 0), 0);
+
+      result.push({
+        date: dateStr,
+        amount: total,
+      });
+    }
+
+    return result;
   };
 
   const fetchWeeklyData = async () => {
@@ -72,17 +128,54 @@ const WeeklyScreen = () => {
       .eq("assigned_staff_email", email)
       .eq("work_status", "COMPLETED");
 
+    const startStr = start.format("YYYY-MM-DD");
+    const endStr = end.format("YYYY-MM-DD");
+
     const filtered =
       bookings?.filter((item: any) => {
-        const date = dayjs(item.completed_at);
-        return (
-          date.isSame(start) ||
-          date.isSame(end) ||
-          (date.isAfter(start) && date.isBefore(end))
-        );
+        if (!item.work_ended_at) return false;
+
+        const dateStr = dayjs(item.work_ended_at).format("YYYY-MM-DD");
+
+        return dateStr >= startStr && dateStr <= endStr;
       }) || [];
 
     setData(filtered);
+
+    // ✅ NEW
+    const daily = getDailyEarnings(filtered, start, end);
+    setDailyData(daily);
+
+    const monthKey = `${selectedYear}-${selectedMonth}`;
+    const weekKey = `week${selectedWeek}`;
+
+    // convert daily array → object
+    const dailyObject: any = {};
+
+    daily.forEach((item) => {
+      dailyObject[item.date] = item.amount;
+    });
+
+    const { data: profile } = await supabase
+      .from("staff_profile")
+      .select("weekly_earnings_json")
+      .eq("email", email)
+      .single();
+
+    let existing = profile?.weekly_earnings_json || {};
+
+    if (!existing[monthKey]) {
+      existing[monthKey] = {};
+    }
+
+    existing[monthKey][weekKey] = dailyObject;
+
+    await supabase
+      .from("staff_profile")
+      .update({
+        weekly_earnings_json: existing,
+      })
+      .eq("email", email);
 
     const total = filtered.reduce(
       (sum: number, item: any) => sum + Number(item.staff_earned_amount || 0),
@@ -126,12 +219,17 @@ const WeeklyScreen = () => {
             <Picker
               selectedValue={selectedYear}
               onValueChange={(itemValue) => setSelectedYear(itemValue)}
-              style={styles.picker}
+              style={[styles.picker, { color: "#000" }]} // ✅ FIX
             >
               {Array.from({ length: 10 }, (_, i) => {
                 const year = currentYear - i;
                 return (
-                  <Picker.Item key={year} label={`${year}`} value={year} />
+                  <Picker.Item
+                    key={year}
+                    label={`${year}`}
+                    value={year}
+                    color="#000"
+                  />
                 );
               })}
             </Picker>
@@ -179,10 +277,10 @@ const WeeklyScreen = () => {
               onValueChange={(itemValue) => setSelectedWeek(itemValue)}
               style={styles.picker}
             >
-              <Picker.Item label="Week 1 (1-7)" value={1} />
-              <Picker.Item label="Week 2 (8-14)" value={2} />
-              <Picker.Item label="Week 3 (15-21)" value={3} />
-              <Picker.Item label="Week 4 (22-end)" value={4} />
+              <Picker.Item label="Week 1 (1-7)" value={1} color="#000" />
+              <Picker.Item label="Week 2 (8-14)" value={2} color="#000" />
+              <Picker.Item label="Week 3 (15-21)" value={3} color="#000" />
+              <Picker.Item label="Week 4 (22-end)" value={4} color="#000" />
             </Picker>
           </View>
 
@@ -198,20 +296,42 @@ const WeeklyScreen = () => {
           </Text>
 
           {/* CARDS */}
-          {data.length === 0 ? (
+          {dailyData.length === 0 ? (
             <Text style={{ marginTop: 20, color: "gray" }}>
-              No services for this week
+              No data for this week
             </Text>
           ) : (
-            data.map((item, i) => (
-              <View key={i} style={styles.card}>
-                <View style={styles.cardRow}>
-                  <Text style={styles.customerName}>{item.customer_name}</Text>
+            <>
+              {/* 🔥 WEEK HEADER */}
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "800",
+                  marginTop: 20,
+                  marginBottom: 10,
+                }}
+              >
+                {getWeekLabel()}
+              </Text>
 
-                  <Text style={styles.amount}>₹{item.staff_earned_amount}</Text>
-                </View>
+              {/* 🔥 DAILY LIST */}
+              {/* TABLE HEADER */}
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableHeaderText}>Date</Text>
+                <Text style={styles.tableHeaderText}>Earnings</Text>
               </View>
-            ))
+
+              {/* TABLE ROWS */}
+              {dailyData.map((item, i) => (
+                <View key={i} style={styles.tableRow}>
+                  <Text style={styles.tableDate}>
+                    {dayjs(item.date).format("DD-MM-YYYY")}
+                  </Text>
+
+                  <Text style={styles.tableAmount}>₹{item.amount}</Text>
+                </View>
+              ))}
+            </>
           )}
         </ScrollView>
       </View>
@@ -244,6 +364,7 @@ const styles = StyleSheet.create({
 
   picker: {
     height: 50,
+    color: "#000", // ✅ REQUIRED
   },
 
   card: {
@@ -271,6 +392,37 @@ const styles = StyleSheet.create({
   amount: {
     fontWeight: "800",
     fontSize: 16,
+    color: "#16a34a",
+  },
+
+  tableHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#F1F5F9",
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+
+  tableHeaderText: {
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  tableDate: {
+    fontWeight: "600",
+  },
+
+  tableAmount: {
+    fontWeight: "800",
     color: "#16a34a",
   },
 });

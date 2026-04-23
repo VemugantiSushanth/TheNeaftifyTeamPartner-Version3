@@ -210,13 +210,54 @@ export default function Dashboard() {
     }
   };
 
+  const updateTotalJSON = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+
+      if (!email) return;
+
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("staff_earned_amount, work_ended_at")
+        .eq("assigned_staff_email", email)
+        .eq("work_status", "COMPLETED");
+
+      let totalJSON: any = {};
+
+      bookings?.forEach((item: any) => {
+        const date = dayjs(item.work_ended_at).format("YYYY-MM-DD");
+        const amount = Number(item.staff_earned_amount || 0);
+
+        if (!totalJSON[date]) {
+          totalJSON[date] = 0;
+        }
+
+        totalJSON[date] += amount;
+      });
+
+      const { error } = await supabase
+        .from("staff_profile")
+        .update({
+          total_earnings_json: totalJSON,
+        })
+        .eq("email", email);
+
+      if (error) console.log("JSON error:", error);
+      else console.log("✅ Total JSON updated");
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   useEffect(() => {
     fetchEarnings();
   }, []);
 
   useEffect(() => {
-    updateAllEarnings(); // 🔥 new function
-    updateMonthlyJSON(); // JSON storage
+    updateAllEarnings();
+    updateMonthlyJSON();
+    updateTotalJSON(); // ✅ ADD THIS
   }, [data]);
 
   const onRefresh = async () => {
@@ -373,7 +414,7 @@ export default function Dashboard() {
 
         <TouchableOpacity
           style={styles.gridBox}
-          onPress={() => setFilter("ALL")}
+          onPress={() => router.push("./total-earnings")} // ✅ ADD THIS
         >
           <Text style={styles.gridTitle}>Total Earnings</Text>
           <Text style={styles.gridValue}>₹{totalEarnings}</Text>
@@ -395,6 +436,7 @@ export default function Dashboard() {
           <Text style={styles.gridValue}>₹{monthlyEarnings}</Text>
         </TouchableOpacity>
       </View>
+
       {/* ================= FILTER ================= */}
       <View style={styles.filterRow}>
         <View style={styles.filterBox}>
