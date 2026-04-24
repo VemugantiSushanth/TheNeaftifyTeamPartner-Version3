@@ -60,24 +60,17 @@ const WeeklyScreen = () => {
   const selectedYearWeek = `${selectedYear}-W${String(selectedWeek).padStart(2, "0")}`;
 
   const getWeekRange = (year: number, month: string, week: number) => {
-    const startDay = (week - 1) * 7 + 1;
+    const base = dayjs(`${year}-${month}-01`);
 
-    // ✅ get actual last day of month
-    const daysInMonth = dayjs(`${year}-${month}-01`).daysInMonth();
-    let endDay = week * 7;
+    const start = base.add((week - 1) * 7, "day").startOf("day");
 
-    // ✅ fix for last week
-    if (week === 4 || endDay > daysInMonth) {
-      endDay = daysInMonth;
+    let end = base.add(week * 7 - 1, "day").endOf("day");
+
+    const endOfMonth = base.endOf("month");
+
+    if (end.isAfter(endOfMonth)) {
+      end = endOfMonth;
     }
-
-    const start = dayjs(
-      `${year}-${month}-${String(startDay).padStart(2, "0")}`,
-    ).startOf("day");
-
-    const end = dayjs(
-      `${year}-${month}-${String(endDay).padStart(2, "0")}`,
-    ).endOf("day");
 
     return { start, end };
   };
@@ -89,22 +82,27 @@ const WeeklyScreen = () => {
   ) => {
     let result: { date: string; amount: number }[] = [];
 
-    const totalDays = end.diff(start, "day") + 1; // ✅ includes last day
+    let current = start.startOf("day");
 
-    for (let i = 0; i < totalDays; i++) {
-      const current = start.add(i, "day");
-      const dateStr = current.format("YYYY-MM-DD");
+    while (current.isSame(end, "day") || current.isBefore(end)) {
+      let total = 0;
 
-      const total = bookings
-        .filter(
-          (item) => dayjs(item.work_ended_at).format("YYYY-MM-DD") === dateStr,
-        )
-        .reduce((sum, item) => sum + Number(item.staff_earned_amount || 0), 0);
+      bookings.forEach((item) => {
+        if (!item.work_ended_at) return; // 👈 ignore null safely
+
+        const workDate = dayjs(item.work_ended_at);
+
+        if (workDate.isSame(current, "day")) {
+          total += Number(item.staff_earned_amount || 0);
+        }
+      });
 
       result.push({
-        date: dateStr,
-        amount: total,
+        date: current.format("YYYY-MM-DD"),
+        amount: total, // 👈 even if 0 → still shown
       });
+
+      current = current.add(1, "day");
     }
 
     return result;
@@ -131,19 +129,21 @@ const WeeklyScreen = () => {
     const startStr = start.format("YYYY-MM-DD");
     const endStr = end.format("YYYY-MM-DD");
 
-    const filtered =
-      bookings?.filter((item: any) => {
-        if (!item.work_ended_at) return false;
-
-        const dateStr = dayjs(item.work_ended_at).format("YYYY-MM-DD");
-
-        return dateStr >= startStr && dateStr <= endStr;
-      }) || [];
+    const filtered = bookings || [];
 
     setData(filtered);
 
     // ✅ NEW
     const daily = getDailyEarnings(filtered, start, end);
+
+    console.log("START:", start.format("YYYY-MM-DD"));
+    console.log("END:", end.format("YYYY-MM-DD"));
+    console.log("RENDERING ITEMS:", dailyData.length);
+    console.log("DAYS GENERATED:", daily.length);
+    console.log(
+      "DATES:",
+      daily.map((d) => d.date),
+    );
     setDailyData(daily);
 
     const monthKey = `${selectedYear}-${selectedMonth}`;
@@ -210,7 +210,11 @@ const WeeklyScreen = () => {
 
       {/* ================= BODY ================= */}
       <View style={{ flex: 1, backgroundColor: "#fff" }}>
-        <ScrollView style={{ flex: 1, padding: 16 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {" "}
           {/* YEAR SELECT */}
           <Text style={{ marginBottom: 6, fontWeight: "600" }}>
             Select Year
@@ -234,13 +238,10 @@ const WeeklyScreen = () => {
               })}
             </Picker>
           </View>
-
           {/* MONTH SELECT */}
-
           <Text style={{ marginBottom: 6, fontWeight: "600" }}>
             Select Month
           </Text>
-
           <View style={styles.dropdownContainer}>
             <Picker
               selectedValue={selectedMonth}
@@ -265,12 +266,10 @@ const WeeklyScreen = () => {
               ))}
             </Picker>
           </View>
-
           {/* WEEK SELECT */}
           <Text style={{ marginBottom: 6, fontWeight: "600" }}>
             Select Week
           </Text>
-
           <View style={styles.dropdownContainer}>
             <Picker
               selectedValue={selectedWeek}
@@ -283,7 +282,6 @@ const WeeklyScreen = () => {
               <Picker.Item label="Week 4 (22-end)" value={4} color="#000" />
             </Picker>
           </View>
-
           {/* EARNINGS */}
           <Text
             style={{
@@ -294,44 +292,38 @@ const WeeklyScreen = () => {
           >
             Earnings: ₹{earnings}
           </Text>
-
           {/* CARDS */}
-          {dailyData.length === 0 ? (
+          {/* 🔥 WEEK HEADER */}
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "800",
+              marginTop: 20,
+              marginBottom: 10,
+            }}
+          >
+            {getWeekLabel()}
+          </Text>
+          {/* TABLE HEADER */}
+          <View style={styles.tableHeader}>
+            <Text style={styles.tableHeaderText}>Date</Text>
+            <Text style={styles.tableHeaderText}>Earnings</Text>
+          </View>
+          {/* TABLE ROWS */}
+          {dailyData.map((item) => (
+            <View key={item.date} style={styles.tableRow}>
+              <Text style={styles.tableDate}>
+                {dayjs(item.date).format("DD-MM-YYYY")}
+              </Text>
+
+              <Text style={styles.tableAmount}>₹{item.amount}</Text>
+            </View>
+          ))}
+          {/* EMPTY STATE (ONLY MESSAGE, NOT BLOCK UI) */}
+          {dailyData.length === 0 && (
             <Text style={{ marginTop: 20, color: "gray" }}>
               No data for this week
             </Text>
-          ) : (
-            <>
-              {/* 🔥 WEEK HEADER */}
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "800",
-                  marginTop: 20,
-                  marginBottom: 10,
-                }}
-              >
-                {getWeekLabel()}
-              </Text>
-
-              {/* 🔥 DAILY LIST */}
-              {/* TABLE HEADER */}
-              <View style={styles.tableHeader}>
-                <Text style={styles.tableHeaderText}>Date</Text>
-                <Text style={styles.tableHeaderText}>Earnings</Text>
-              </View>
-
-              {/* TABLE ROWS */}
-              {dailyData.map((item, i) => (
-                <View key={i} style={styles.tableRow}>
-                  <Text style={styles.tableDate}>
-                    {dayjs(item.date).format("DD-MM-YYYY")}
-                  </Text>
-
-                  <Text style={styles.tableAmount}>₹{item.amount}</Text>
-                </View>
-              ))}
-            </>
           )}
         </ScrollView>
       </View>
