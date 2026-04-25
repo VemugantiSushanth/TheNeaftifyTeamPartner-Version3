@@ -62,14 +62,22 @@ const WeeklyScreen = () => {
   const getWeekRange = (year: number, month: string, week: number) => {
     const base = dayjs(`${year}-${month}-01`);
 
-    const start = base.add((week - 1) * 7, "day").startOf("day");
+    let start;
+    let end;
 
-    let end = base.add(week * 7 - 1, "day").endOf("day");
-
-    const endOfMonth = base.endOf("month");
-
-    if (end.isAfter(endOfMonth)) {
-      end = endOfMonth;
+    if (week === 1) {
+      start = base.date(1).startOf("day");
+      end = base.date(7).endOf("day");
+    } else if (week === 2) {
+      start = base.date(8).startOf("day");
+      end = base.date(14).endOf("day");
+    } else if (week === 3) {
+      start = base.date(15).startOf("day");
+      end = base.date(21).endOf("day");
+    } else {
+      // 🔥 Week 4 fix
+      start = base.date(22).startOf("day");
+      end = base.endOf("month"); // ✅ FULL month end
     }
 
     return { start, end };
@@ -84,7 +92,12 @@ const WeeklyScreen = () => {
 
     let current = start.startOf("day");
 
-    while (current.isSame(end, "day") || current.isBefore(end)) {
+    const today = dayjs().endOf("day");
+
+    while (
+      (current.isSame(end, "day") || current.isBefore(end)) &&
+      current.isSameOrBefore(today, "day") // 🔥 stop future dates
+    ) {
       let total = 0;
 
       bookings.forEach((item) => {
@@ -133,17 +146,16 @@ const WeeklyScreen = () => {
 
     setData(filtered);
 
+    const today = dayjs();
+
+    if (start.isAfter(today, "day")) {
+      setDailyData([]);
+      setEarnings(0);
+      return;
+    }
+
     // ✅ NEW
     const daily = getDailyEarnings(filtered, start, end);
-
-    console.log("START:", start.format("YYYY-MM-DD"));
-    console.log("END:", end.format("YYYY-MM-DD"));
-    console.log("RENDERING ITEMS:", dailyData.length);
-    console.log("DAYS GENERATED:", daily.length);
-    console.log(
-      "DATES:",
-      daily.map((d) => d.date),
-    );
     setDailyData(daily);
 
     const monthKey = `${selectedYear}-${selectedMonth}`;
@@ -211,10 +223,10 @@ const WeeklyScreen = () => {
       {/* ================= BODY ================= */}
       <View style={{ flex: 1, backgroundColor: "#fff" }}>
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }} // 🔥 IMPORTANT
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }} // 👈 more space
+          showsVerticalScrollIndicator={true}
         >
-          {" "}
           {/* YEAR SELECT */}
           <Text style={{ marginBottom: 6, fontWeight: "600" }}>
             Select Year
